@@ -480,26 +480,6 @@ body.sdc-eyedropper-active img {
 }
 
 /* ============================================================
- * Settings drawer flash highlight (wand-button click feedback)
- * ============================================================ */
-.sdc-settings-flash {
-  animation: sdc-flash 0.8s ease;
-}
-
-@keyframes sdc-flash {
-  0% {
-    background-color: color-mix(
-      in srgb,
-      var(--SmartThemeQuoteColor, #6c8cff) 30%,
-      transparent
-    );
-  }
-  100% {
-    background-color: transparent;
-  }
-}
-
-/* ============================================================
  * Send As / NPC color overrides UI
  * ============================================================ */
 .sdc-extension-settings .sdc-name-overrides-list {

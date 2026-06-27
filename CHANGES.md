@@ -3,19 +3,20 @@
 ## 🆕 Version 3.0.0 - "Palette Talk" Fork (Nufahi)
 
 **Renamed to Palette Talk.** This fork of
-`b4bysw0rld/SillyTavern-Smart-Dialogue-Colorizer` fixes the wand-menu bug and
-adds an eyedropper, live preview, NPC name colors, mobile support and a
-hot-reload guard.
+`b4bysw0rld/SillyTavern-Smart-Dialogue-Colorizer` adds an eyedropper, live
+preview, NPC name colors, mobile support and a hot-reload guard, and restyles
+the settings panel.
 
 > The internal name is now `SillyTavern-Palette-Talk`, so settings are stored
 > separately and Palette Talk can coexist with the original extension.
 
-### 🐛 Bug fixes
-- **Wand (Extensions) menu button fixed.** The button now reliably appears in
-  the wand menu (polls for the lazily-built menu instead of giving up at load),
-  is inserted into the correct `.list-group` container, closes the wand menu on
-  click, and no longer leaves the settings drawer stuck half-open. Touch devices
-  get a double-fire guard.
+### 🧹 Changes
+- **Removed the wand (Extensions) menu button.** It was buggy in the original
+  (hung in the wand menu / didn't open settings) and redundant — Palette Talk
+  has no window of its own, all settings live in the Extensions panel. The
+  settings drawer header now shows a palette icon like every other extension.
+- **Restyled settings panel** into a rounded card (soft surfaces, pill sections,
+  accent-highlighted toggle rows) matching my other extensions.
 
 ### ✨ New features
 - **Eyedropper (color picker pipette).** Pick a dialogue color straight from a

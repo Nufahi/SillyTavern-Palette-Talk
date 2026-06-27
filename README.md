@@ -2,14 +2,14 @@
 
 A SillyTavern extension that automatically colors dialogue quotes based on character avatars, with intelligent color extraction, quality filtering, an eyedropper, live preview and per-name NPC colors.
 
-> **Palette Talk is a fork** of [b4bysw0rld/SillyTavern-Smart-Dialogue-Colorizer](https://github.com/b4bysw0rld/SillyTavern-Smart-Dialogue-Colorizer) with the wand-menu bug fixed and several new features added (eyedropper, live preview, Send-As/NPC colors, mobile support). See [CHANGES.md](CHANGES.md) for the full list.
+> **Palette Talk is a fork** of [b4bysw0rld/SillyTavern-Smart-Dialogue-Colorizer](https://github.com/b4bysw0rld/SillyTavern-Smart-Dialogue-Colorizer) with several new features added (eyedropper, live preview, Send-As/NPC colors, mobile support). See [CHANGES.md](CHANGES.md) for the full list.
 
 ## 🆕 What's new in this fork
 - **Eyedropper / pipette** — pick a dialogue color straight from a character's avatar (native `EyeDropper` API, with a click-on-avatar fallback).
 - **Live preview** — see a sample quote in the chosen color before saving.
 - **Send As / NPC colors** — color NPC dialogue by name, even via "Send As" (fixes upstream Issue #1).
-- **Fixed wand-menu button** — no longer hangs in the wand menu or fails to open the settings.
 - **Mobile-friendly** — larger touch targets and anti-zoom inputs.
+- **Settings live in the Extensions panel** (no redundant wand-menu button).
 
 ## ✨ Features
 
@@ -99,7 +99,6 @@ If you use **"Send As"** to voice NPCs (instead of group chats), those messages 
 
 ## 🆚 Improvements Over Original
 
-- Fixed wand (Extensions) menu button — no longer hangs or fails to open settings
 - Eyedropper to pick colors from avatars
 - Live dialogue color preview
 - Send As / NPC coloring by name

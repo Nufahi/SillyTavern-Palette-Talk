@@ -905,129 +905,6 @@ function initializeNameOverridesUI() {
   renderRows();
 }
 
-/**
- * Closes SillyTavern's wand (extensions) dropdown menu. ST itself closes the
- * menu via a delegated document click handler, but we close it explicitly too
- * so the menu never lingers if our handler ran first.
- */
-function closeExtensionsMenu() {
-  const menu = document.getElementById("extensionsMenu");
-  if (!menu) return;
-  // jQuery is available in ST; use it when present for the same fade ST uses.
-  try {
-    if (typeof $ === "function") {
-      $(menu).fadeOut?.(150);
-      $(menu).hide?.();
-      return;
-    }
-  } catch (_) {
-    /* noop — fall through to plain style toggle */
-  }
-  menu.style.display = "none";
-}
-
-/**
- * Opens (and scrolls to) the extension's settings drawer in the Extensions tab.
- * Lets ST's own inline-drawer click handler do the toggling so we never leave
- * the drawer in a half-open ("stuck") state.
- */
-function openSettingsDrawer() {
-  const settingsDrawer = document.getElementById("sdc-extension-settings");
-  if (!settingsDrawer) {
-    console.warn("[Palette Talk] Settings drawer not found");
-    return;
-  }
-
-  const drawerToggle = settingsDrawer.querySelector(".inline-drawer-toggle");
-  const drawerContent = settingsDrawer.querySelector(".inline-drawer-content");
-
-  // Only trigger ST's toggle if the drawer is currently closed. ST sets the
-  // 'open' class on the toggle when expanded, so we mirror that check and let
-  // ST handle the icon + content state itself (avoids the stuck-drawer bug).
-  const isOpen =
-    drawerToggle?.classList.contains("open") ||
-    drawerContent?.classList.contains("open");
-  if (drawerToggle && !isOpen) {
-    drawerToggle.click();
-  }
-
-  settingsDrawer.scrollIntoView({ behavior: "smooth", block: "start" });
-
-  // Brief highlight effect to draw attention.
-  settingsDrawer.classList.add("sdc-settings-flash");
-  setTimeout(() => settingsDrawer.classList.remove("sdc-settings-flash"), 800);
-}
-
-/**
- * Adds a button to SillyTavern's wand (Extensions) dropdown menu that opens the
- * extension's settings. The menu is built lazily by ST, so we poll for it
- * instead of assuming it exists at init time (this was the source of the
- * "button never shows / hangs in the wand menu" bug).
- *
- * @returns {boolean} true if the button was added or already exists
- */
-function addExtensionMenuButton() {
-  // ST builds the wand items inside '#extensionsMenu .list-group'. Fall back to
-  // the menu root or the gallery wand container for older/newer ST layouts.
-  const container =
-    document.querySelector("#extensionsMenu .list-group") ||
-    document.getElementById("extensionsMenu") ||
-    document.getElementById("gallery_wand_container");
-  if (!(container instanceof HTMLElement)) return false;
-
-  // Already present — nothing to do.
-  if (document.getElementById("sdc-extensions-menu-button")) return true;
-
-  const button = document.createElement("div");
-  button.id = "sdc-extensions-menu-button";
-  button.className = "list-group-item flex-container flexGap5 interactable";
-  button.title = "Open Palette Talk Settings";
-  button.tabIndex = 0;
-  button.setAttribute("role", "button");
-
-  // Icon must be a <div> (not <i>) with the 'extensionsMenuExtensionButton'
-  // class so SillyTavern sizes/aligns it correctly inside the wand menu.
-  const icon = document.createElement("div");
-  icon.className = "fa-solid fa-palette extensionsMenuExtensionButton";
-  const label = document.createElement("span");
-  label.textContent = "Palette Talk";
-  button.appendChild(icon);
-  button.appendChild(label);
-
-  // Guard against double-fire: touch devices fire 'touchend' plus a synthetic
-  // 'click' for a single tap. Only preventDefault — do NOT stopPropagation, or
-  // ST's delegated document click handler that closes the wand menu won't run.
-  let lastFire = 0;
-  const activate = (e) => {
-    e.preventDefault();
-    const now = Date.now();
-    if (now - lastFire < 400) return;
-    lastFire = now;
-    openSettingsDrawer();
-    closeExtensionsMenu();
-  };
-  button.addEventListener("click", activate);
-  button.addEventListener("touchend", activate, { passive: false });
-
-  container.appendChild(button);
-  return true;
-}
-
-/**
- * Polls for ST's wand menu and inserts our button once it exists.
- * @returns {number} interval id (so it can be cleared on dispose)
- */
-function scheduleExtensionMenuButton() {
-  if (addExtensionMenuButton()) return 0;
-  let tries = 0;
-  const timer = window.setInterval(() => {
-    if (addExtensionMenuButton() || ++tries > 40) {
-      clearInterval(timer);
-    }
-  }, 500);
-  return timer;
-}
-
 function initializeCharSpecificUI() {
   /**
    * Preset colors for quick selection (readable on both light/dark themes)
@@ -1432,10 +1309,8 @@ jQuery(async ($) => {
   initializeNameOverridesUI();
   initializeCharSpecificUI();
 
-  // Add extension menu button for quick access to settings (polls for the wand
-  // menu, since ST builds it lazily).
-  const wandTimer = scheduleExtensionMenuButton();
-  if (wandTimer) onDispose(() => clearInterval(wandTimer));
+  // Note: Palette Talk has no wand-menu button on purpose — all settings live
+  // in the Extensions panel, so a wand entry would just duplicate that.
 
   eventSource.on(event_types.CHAT_CHANGED, () => {
     updateCharactersStyleSheet();
@@ -1539,7 +1414,6 @@ jQuery(async ($) => {
     // Remove injected DOM nodes.
     [
       "sdc-extension-settings",
-      "sdc-extensions-menu-button",
       "sdc-chars_style_sheet",
       "sdc-personas_style_sheet",
       "sdc-names_style_sheet",
