@@ -767,7 +767,10 @@ function initializeSettingsUI() {
 function initializeNameOverridesUI() {
   const root = document.getElementById("sdc-extension-settings");
   if (!root) return;
-  const content = root.querySelector(".inline-drawer-content");
+  // Prefer the styled card so the section sits inside the rounded panel.
+  const content =
+    root.querySelector(".sdc_settings_card") ||
+    root.querySelector(".inline-drawer-content");
   if (!content) return;
 
   extSettings.nameColorOverrides ??= {};
@@ -777,9 +780,10 @@ function initializeNameOverridesUI() {
   section.className = "sdc-extension_block dc-color-settings-group";
 
   const header = document.createElement("div");
+  header.className = "sdc_settings_section_head";
   header.innerHTML = `
         <label title="Colour dialogue for characters posted via 'Send As' (NPCs without their own avatar), matched by name.">
-            <h4>Send As / NPC Colors<span class="margin5 fa-solid fa-circle-info opacity50p"></span></h4>
+            <h4 class="sdc_settings_heading">Send As / NPC Colors<span class="margin5 fa-solid fa-circle-info opacity50p"></span></h4>
         </label>`;
   section.appendChild(header);
 
@@ -981,7 +985,9 @@ function addExtensionMenuButton() {
   button.tabIndex = 0;
   button.setAttribute("role", "button");
 
-  const icon = document.createElement("i");
+  // Icon must be a <div> (not <i>) with the 'extensionsMenuExtensionButton'
+  // class so SillyTavern sizes/aligns it correctly inside the wand menu.
+  const icon = document.createElement("div");
   icon.className = "fa-solid fa-palette extensionsMenuExtensionButton";
   const label = document.createElement("span");
   label.textContent = "Palette Talk";
