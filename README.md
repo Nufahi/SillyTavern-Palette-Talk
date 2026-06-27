@@ -1,6 +1,15 @@
-# Smart Dialogue Colorizer
+# Palette Talk
 
-An improved SillyTavern extension that automatically colors dialogue quotes based on character avatars with intelligent color extraction and quality filtering.
+A SillyTavern extension that automatically colors dialogue quotes based on character avatars, with intelligent color extraction, quality filtering, an eyedropper, live preview and per-name NPC colors.
+
+> **Palette Talk is a fork** of [b4bysw0rld/SillyTavern-Smart-Dialogue-Colorizer](https://github.com/b4bysw0rld/SillyTavern-Smart-Dialogue-Colorizer) with the wand-menu bug fixed and several new features added (eyedropper, live preview, Send-As/NPC colors, mobile support). See [CHANGES.md](CHANGES.md) for the full list.
+
+## 🆕 What's new in this fork
+- **Eyedropper / pipette** — pick a dialogue color straight from a character's avatar (native `EyeDropper` API, with a click-on-avatar fallback).
+- **Live preview** — see a sample quote in the chosen color before saving.
+- **Send As / NPC colors** — color NPC dialogue by name, even via "Send As" (fixes upstream Issue #1).
+- **Fixed wand-menu button** — no longer hangs in the wand menu or fails to open the settings.
+- **Mobile-friendly** — larger touch targets and anti-zoom inputs.
 
 ## ✨ Features
 
@@ -52,13 +61,13 @@ div.mes .mesIDDisplay:not(:empty) {
 
 Alternatively, manually place the extension folder in:
 ```
-SillyTavern/public/scripts/extensions/third-party/Smart-Dialogue-Colorizer/
+SillyTavern/public/scripts/extensions/third-party/SillyTavern-Palette-Talk/
 ```
 
 ## 🎨 Usage
 
 1. Open **Extensions** panel in SillyTavern
-2. Find **Smart Dialogue Colorizer** settings
+2. Find **Palette Talk** settings
 3. Configure:
    - **Character Dialogue Settings**: How character quotes are colored
    - **Persona Dialogue Settings**: How your persona's quotes are colored
@@ -77,14 +86,28 @@ SillyTavern/public/scripts/extensions/third-party/Smart-Dialogue-Colorizer/
 
 In the Character Editor or Persona settings, you'll find a "Dialogue Color" field where you can set custom colors for specific characters, overriding the global settings.
 
+You can set the color in three ways:
+- **Preset swatches** — click one of the quick color dots.
+- **Hex / color picker** — type a `#RRGGBB` value or use the native color box.
+- **Eyedropper** 🩹 — click the eyedropper button to sample a color straight from the avatar (or anywhere on screen in supported browsers).
+
+A **live preview** shows a sample quote in the chosen color so you can check readability before saving.
+
+### Send As / NPC Colors
+
+If you use **"Send As"** to voice NPCs (instead of group chats), those messages have no avatar to extract a color from. In the **Send As / NPC Colors** section of the settings panel you can map a character *name* to a color, and matching messages will be colored by name.
+
 ## 🆚 Improvements Over Original
 
+- Fixed wand (Extensions) menu button — no longer hangs or fails to open settings
+- Eyedropper to pick colors from avatars
+- Live dialogue color preview
+- Send As / NPC coloring by name
+- Mobile-friendly UI (larger touch targets, anti-zoom inputs)
+- Hot-reload safe (no duplicate buttons/observers on update)
 - More reliable color extraction that works with a wider variety of avatars
 - Smart fallback system prevents failures when vibrant colors aren't available
 - Better contrast algorithm ensures readability
-- Quality filtering removes poor color choices
-- Simplified UI focused on quoted text (no chat bubble complexity)
-- Cleaner codebase with better performance
 
 ## 📝 License
 

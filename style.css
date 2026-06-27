@@ -1,4 +1,4 @@
-/* Smart Dialogue Colorizer Extension Styles */
+/* Palette Talk Extension Styles */
 
 .sdc-extension-settings .dc-flex-container {
   display: flex;
@@ -285,7 +285,239 @@
 
 /* Static rule for dialogue coloring */
 /* Uses the variable if defined, otherwise inherits (default behavior) */
-.mes[sdc-author_uid] .mes_text q {
+.mes[sdc-author_uid] .mes_text q,
+.mes[sdc-author_name] .mes_text q {
   color: var(--character-color, inherit);
   transition: color 0.2s ease;
+}
+
+/* ============================================================
+ * Eyedropper button + active picking mode
+ * ============================================================ */
+.sdc-eyedropper-btn {
+  flex-shrink: 0;
+  width: 22px !important;
+  min-width: 22px !important;
+  height: 22px !important;
+  padding: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.12s ease;
+  opacity: 0.7;
+}
+
+.sdc-eyedropper-btn:hover {
+  opacity: 1;
+  background-color: color-mix(
+    in srgb,
+    var(--SmartThemeQuoteColor, #6c8cff) 22%,
+    transparent
+  );
+  transform: scale(1.1);
+}
+
+.sdc-eyedropper-btn i {
+  font-size: 0.8em;
+}
+
+.sdc-eyedropper-btn-active {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--SmartThemeQuoteColor, #6c8cff);
+}
+
+/* While the click-on-avatar fallback is active, hint that avatars are pickable. */
+body.sdc-eyedropper-active {
+  cursor: crosshair !important;
+}
+
+body.sdc-eyedropper-active img {
+  cursor: crosshair !important;
+  outline: 2px dashed var(--SmartThemeQuoteColor, #6c8cff);
+  outline-offset: 1px;
+}
+
+/* ============================================================
+ * Live dialogue preview (character/persona override UI)
+ * ============================================================ */
+.sdc-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 0.8em;
+}
+
+.sdc-preview-label {
+  opacity: 0.55;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.85em;
+}
+
+.sdc-preview-quote {
+  font-style: italic;
+  font-weight: 600;
+  transition: color 0.2s ease;
+  color: var(--SmartThemeBodyColor, inherit);
+}
+
+/* ============================================================
+ * Settings drawer flash highlight (wand-button click feedback)
+ * ============================================================ */
+.sdc-settings-flash {
+  animation: sdc-flash 0.8s ease;
+}
+
+@keyframes sdc-flash {
+  0% {
+    background-color: color-mix(
+      in srgb,
+      var(--SmartThemeQuoteColor, #6c8cff) 30%,
+      transparent
+    );
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+/* ============================================================
+ * Send As / NPC color overrides UI
+ * ============================================================ */
+.sdc-extension-settings .sdc-name-overrides-list {
+  display: flex;
+  flex-flow: column nowrap;
+  gap: 4px;
+  margin: 6px 0;
+}
+
+.sdc-extension-settings .sdc-name-overrides-empty {
+  font-size: 0.8em;
+  opacity: 0.5;
+  font-style: italic;
+  padding: 4px 0;
+}
+
+.sdc-extension-settings .sdc-name-override-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: var(--SmartThemeBlurTintColor, rgba(0, 0, 0, 0.1));
+  border: 1px solid
+    var(--SmartThemeBorderColor, rgba(100, 100, 100, 0.3));
+}
+
+.sdc-extension-settings .sdc-name-override-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.sdc-extension-settings .sdc-name-override-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.sdc-extension-settings .sdc-name-override-hex {
+  font-family: monospace;
+  font-size: 0.8em;
+  opacity: 0.6;
+}
+
+.sdc-extension-settings .sdc-name-override-del {
+  flex-shrink: 0;
+  width: 24px !important;
+  min-width: 24px !important;
+  height: 24px !important;
+  padding: 0 !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+}
+
+.sdc-extension-settings .sdc-name-override-del:hover {
+  opacity: 1;
+}
+
+.sdc-extension-settings .sdc-name-override-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.sdc-extension-settings .sdc-name-override-add input[type="text"]:first-child {
+  flex: 1;
+  min-width: 100px;
+}
+
+.sdc-extension-settings .sdc-name-override-addbtn {
+  flex-shrink: 0;
+}
+
+/* ============================================================
+ * Mobile adaptation
+ * Larger touch targets + anti-zoom inputs on phones / touch devices.
+ * ============================================================ */
+@media (max-width: 768px), (pointer: coarse) {
+  /* Prevent iOS Safari from zooming when focusing text inputs. */
+  .sdc-extension-settings input[type="text"],
+  .sdc-color-override-container input[type="text"] {
+    font-size: 16px !important;
+  }
+
+  /* The inline color row can get cramped — let controls wrap. */
+  .sdc-inline-color-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Bigger preset swatches for fingers. */
+  .sdc-preset-swatch {
+    width: 26px;
+    height: 26px;
+  }
+
+  .sdc-preset-swatch.selected::after {
+    font-size: 13px;
+  }
+
+  /* Bigger icon buttons (eyedropper / reset / delete). */
+  .sdc-eyedropper-btn,
+  .sdc-reset-btn,
+  .sdc-custom-picker-wrapper,
+  .sdc-hex-input {
+    width: 32px !important;
+    min-width: 32px !important;
+    height: 32px !important;
+  }
+
+  .sdc-hex-input {
+    width: 84px !important;
+  }
+
+  .sdc-name-override-del {
+    width: 34px !important;
+    min-width: 34px !important;
+    height: 34px !important;
+  }
+
+  /* Stack the add-row controls on narrow screens. */
+  .sdc-name-override-add {
+    gap: 8px;
+  }
+  .sdc-name-override-add .sdc-name-override-addbtn {
+    flex: 1;
+  }
 }

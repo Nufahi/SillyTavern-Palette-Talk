@@ -34,6 +34,7 @@ import {
   isInGroupChat,
 } from "./st-utils.js";
 import { setInputColorPickerComboValue } from "./utils.js";
+import { pickColor, isNativeEyeDropperSupported } from "./eyedropper.js";
 
 //#endregion Local imports
 
@@ -53,7 +54,7 @@ export const ColorizeSourceType = {
 };
 
 /**
- * @typedef {defaultExtSettings} SDCSettings
+ * @typedef {defaultExtSettings} PaletteTalkSettings
  */
 const defaultCharColorSettings = {
   colorizeSource: ColorizeSourceType.AVATAR_SMART,
@@ -65,9 +66,12 @@ const defaultCharColorSettings = {
 const defaultExtSettings = {
   charColorSettings: defaultCharColorSettings,
   personaColorSettings: defaultCharColorSettings,
+  // Maps a displayed character NAME (lowercased) -> hex colour. Used for
+  // "Send As" NPCs whose messages can't be resolved to a real character/avatar.
+  nameColorOverrides: {},
 };
 
-const extName = "SillyTavern-Smart-Dialogue-Colorizer";
+const extName = "SillyTavern-Palette-Talk";
 const extFolderPath = `scripts/extensions/third-party/${extName}`;
 const extSettings = initializeSettings(extName, defaultExtSettings);
 
@@ -89,6 +93,8 @@ function debounce(fn, delay = 100) {
 let charactersStyleSheet;
 /** @type {HTMLStyleElement} */
 let personasStyleSheet;
+/** @type {HTMLStyleElement} */
+let namesStyleSheet;
 
 /**
  * @param {STCharacter} stChar
@@ -365,7 +371,7 @@ async function getCharacterDialogueColor(stChar) {
         return exColor;
       } catch (error) {
         console.warn(
-          `[SDC] Failed to extract color from avatar for ${stChar.uid}:`,
+          `[Palette Talk] Failed to extract color from avatar for ${stChar.uid}:`,
           error
         );
         // Return default color on error
@@ -401,28 +407,51 @@ function getTextValidHexOrDefault(textboxValue, defaultValue) {
 }
 
 /**
- * Adds author UID attribute to a message element.
+ * Reads the displayed character name from a message element.
+ * Used as a fallback for "Send As" NPCs that have no resolvable avatar.
+ *
+ * @param {HTMLElement} message
+ * @returns {string} The trimmed display name, or "".
+ */
+function getMessageDisplayName(message) {
+  const nameElem = message.querySelector(".ch_name .name_text, .name_text");
+  return (nameElem?.textContent ?? "").trim();
+}
+
+/**
+ * Adds author UID + display-name attributes to a message element.
+ *
+ * The UID attribute drives avatar-based colouring. The name attribute is a
+ * fallback so "Send As" NPC messages (which often share a default avatar and
+ * can't be resolved to a real character) can still be coloured by name.
  *
  * @param {HTMLElement} message
  */
 function addAuthorUidClassToMessage(message) {
   const authorChatUidAttr = "sdc-author_uid";
+
+  // Always (re)tag the display name — Send-As can reuse a message slot.
+  const displayName = getMessageDisplayName(message);
+  if (displayName) {
+    message.setAttribute("sdc-author_name", displayName.toLowerCase());
+  }
+
   if (message.hasAttribute(authorChatUidAttr)) {
-    console.debug(
-      `[SDC] Message already has '${authorChatUidAttr}' attribute, skipping.`
-    );
     return;
   }
 
-  const messageAuthorChar = getMessageAuthor(message);
-  if (!messageAuthorChar) {
-    console.error(
-      "[SDC] Couldn't get message author character to add attribute."
-    );
-    return;
+  let messageAuthorChar = null;
+  try {
+    messageAuthorChar = getMessageAuthor(message);
+  } catch (err) {
+    // Send-As NPCs / unusual avatars can throw here; that's expected — we
+    // fall back to name-based colouring below instead of failing.
+    console.debug("[Palette Talk] Could not resolve message author, using name fallback.", err);
   }
 
-  message.setAttribute(authorChatUidAttr, messageAuthorChar.uid);
+  if (messageAuthorChar) {
+    message.setAttribute(authorChatUidAttr, messageAuthorChar.uid);
+  }
 }
 
 function addAuthorUidToExistingMessages() {
@@ -451,6 +480,12 @@ const schedulePersonaSettingsRefresh = debounce(async () => {
 const scheduleAllSettingsRefresh = debounce(async () => {
   await updateCharactersStyleSheet();
   await updatePersonasStyleSheet();
+  updateNamesStyleSheet();
+  saveSettingsDebounced();
+}, 120);
+
+const scheduleNamesRefresh = debounce(() => {
+  updateNamesStyleSheet();
   saveSettingsDebounced();
 }, 120);
 
@@ -508,12 +543,48 @@ function onPersonaChanged(persona) {
 function initializeStyleSheets() {
   charactersStyleSheet = createAndAppendStyleSheet("sdc-chars_style_sheet");
   personasStyleSheet = createAndAppendStyleSheet("sdc-personas_style_sheet");
+  namesStyleSheet = createAndAppendStyleSheet("sdc-names_style_sheet");
 
   function createAndAppendStyleSheet(id) {
     const styleSheet = document.createElement("style");
     styleSheet.id = id;
     return document.body.appendChild(styleSheet);
   }
+}
+
+/**
+ * Escapes a string for safe use inside a CSS attribute-selector value.
+ * @param {string} value
+ * @returns {string}
+ */
+function cssEscapeAttrValue(value) {
+  return String(value).replace(/["\\]/g, "\\$&");
+}
+
+/**
+ * Rebuilds the name-based stylesheet from `nameColorOverrides`. This colours
+ * "Send As" NPC dialogue (and names) by the displayed character name, which is
+ * the only reliable identifier those messages have.
+ */
+function updateNamesStyleSheet() {
+  if (!namesStyleSheet) return;
+  const overrides = extSettings.nameColorOverrides || {};
+  const colorNames = extSettings.charColorSettings.colorNameText;
+
+  const rules = Object.entries(overrides)
+    .filter(([name, hex]) => name && hex)
+    .map(([name, hex]) => {
+      const sel = `.mes[sdc-author_name="${cssEscapeAttrValue(name)}"]`;
+      let rule = `
+        ${sel} { --character-color: ${hex}; }`;
+      if (colorNames) {
+        rule += `
+        ${sel} .name_text { color: var(--character-color); }`;
+      }
+      return rule;
+    });
+
+  namesStyleSheet.innerHTML = rules.join("");
 }
 
 function initializeSettingsUI() {
@@ -688,78 +759,267 @@ function initializeSettingsUI() {
 }
 
 /**
- * Adds a button to the Extensions dropdown menu for Smart Dialogue Colorizer
- * This function creates a menu item in SillyTavern's Extensions dropdown
- * that scrolls to and opens the extension's settings panel.
+ * Builds the "Send As / NPC Colors" section in the settings panel. Lets the
+ * user map a character NAME to a colour, which is applied to messages posted
+ * via the "Send As" feature (those NPCs have no resolvable avatar). Solves
+ * upstream Issue #1.
+ */
+function initializeNameOverridesUI() {
+  const root = document.getElementById("sdc-extension-settings");
+  if (!root) return;
+  const content = root.querySelector(".inline-drawer-content");
+  if (!content) return;
+
+  extSettings.nameColorOverrides ??= {};
+
+  const section = document.createElement("div");
+  section.id = "sdc-name_overrides_settings";
+  section.className = "sdc-extension_block dc-color-settings-group";
+
+  const header = document.createElement("div");
+  header.innerHTML = `
+        <label title="Colour dialogue for characters posted via 'Send As' (NPCs without their own avatar), matched by name.">
+            <h4>Send As / NPC Colors<span class="margin5 fa-solid fa-circle-info opacity50p"></span></h4>
+        </label>`;
+  section.appendChild(header);
+
+  const list = document.createElement("div");
+  list.className = "sdc-name-overrides-list";
+  section.appendChild(list);
+
+  /** Re-renders the list of name -> colour rows. */
+  function renderRows() {
+    list.innerHTML = "";
+    const entries = Object.entries(extSettings.nameColorOverrides);
+    if (entries.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "sdc-name-overrides-empty";
+      empty.textContent = "No NPC colors yet. Add one below.";
+      list.appendChild(empty);
+    }
+    entries.forEach(([name, hex]) => list.appendChild(createRow(name, hex)));
+  }
+
+  /**
+   * @param {string} name
+   * @param {string} hex
+   */
+  function createRow(name, hex) {
+    const row = document.createElement("div");
+    row.className = "sdc-name-override-row";
+
+    const swatch = document.createElement("span");
+    swatch.className = "sdc-name-override-swatch";
+    swatch.style.backgroundColor = hex;
+
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "sdc-name-override-name";
+    nameSpan.textContent = name;
+    nameSpan.title = name;
+
+    const hexSpan = document.createElement("span");
+    hexSpan.className = "sdc-name-override-hex";
+    hexSpan.textContent = hex.toUpperCase();
+
+    const delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "menu_button menu_button_icon sdc-name-override-del";
+    delBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
+    delBtn.title = "Remove this NPC color";
+    delBtn.onclick = () => {
+      delete extSettings.nameColorOverrides[name];
+      renderRows();
+      scheduleNamesRefresh();
+    };
+
+    row.append(swatch, nameSpan, hexSpan, delBtn);
+    return row;
+  }
+
+  // --- Add-new row -----------------------------------------------------
+  const addRow = document.createElement("div");
+  addRow.className = "sdc-name-override-add";
+
+  const nameInput = document.createElement("input");
+  nameInput.type = "text";
+  nameInput.className = "text_pole";
+  nameInput.placeholder = "Character name";
+
+  const hexInput = document.createElement("input");
+  hexInput.type = "text";
+  hexInput.className = "text_pole sdc-hex-input";
+  hexInput.placeholder = "#RRGGBB";
+  hexInput.maxLength = 7;
+
+  const colorPickerWrapper = document.createElement("div");
+  colorPickerWrapper.className =
+    "dc-color-picker-wrapper sdc-custom-picker-wrapper";
+  const colorInput = document.createElement("input");
+  colorInput.type = "color";
+  colorInput.className = "dc-color-picker";
+  colorInput.value = "#e18a24";
+  colorPickerWrapper.appendChild(colorInput);
+
+  colorInput.addEventListener("input", () => {
+    hexInput.value = colorInput.value;
+  });
+
+  const eyedropperBtn = document.createElement("button");
+  eyedropperBtn.type = "button";
+  eyedropperBtn.className = "menu_button menu_button_icon sdc-eyedropper-btn";
+  eyedropperBtn.innerHTML = '<i class="fa-solid fa-eye-dropper"></i>';
+  eyedropperBtn.title = isNativeEyeDropperSupported()
+    ? "Pick a colour from anywhere on screen"
+    : "Pick a colour by clicking on an avatar";
+  eyedropperBtn.onclick = async () => {
+    const picked = await pickColor();
+    if (picked) {
+      hexInput.value = picked;
+      colorInput.value = picked;
+    }
+  };
+
+  const addBtn = document.createElement("button");
+  addBtn.type = "button";
+  addBtn.className = "menu_button sdc-name-override-addbtn";
+  addBtn.textContent = "Add";
+  addBtn.onclick = () => {
+    const name = nameInput.value.trim();
+    const hex = getTextValidHexOrDefault(hexInput.value, colorInput.value);
+    if (!name || !hex) return;
+    extSettings.nameColorOverrides[name.toLowerCase()] = hex;
+    nameInput.value = "";
+    hexInput.value = "";
+    renderRows();
+    scheduleNamesRefresh();
+  };
+
+  addRow.append(nameInput, hexInput, colorPickerWrapper, eyedropperBtn, addBtn);
+  section.appendChild(addRow);
+
+  content.appendChild(section);
+  renderRows();
+}
+
+/**
+ * Closes SillyTavern's wand (extensions) dropdown menu. ST itself closes the
+ * menu via a delegated document click handler, but we close it explicitly too
+ * so the menu never lingers if our handler ran first.
+ */
+function closeExtensionsMenu() {
+  const menu = document.getElementById("extensionsMenu");
+  if (!menu) return;
+  // jQuery is available in ST; use it when present for the same fade ST uses.
+  try {
+    if (typeof $ === "function") {
+      $(menu).fadeOut?.(150);
+      $(menu).hide?.();
+      return;
+    }
+  } catch (_) {
+    /* noop — fall through to plain style toggle */
+  }
+  menu.style.display = "none";
+}
+
+/**
+ * Opens (and scrolls to) the extension's settings drawer in the Extensions tab.
+ * Lets ST's own inline-drawer click handler do the toggling so we never leave
+ * the drawer in a half-open ("stuck") state.
+ */
+function openSettingsDrawer() {
+  const settingsDrawer = document.getElementById("sdc-extension-settings");
+  if (!settingsDrawer) {
+    console.warn("[Palette Talk] Settings drawer not found");
+    return;
+  }
+
+  const drawerToggle = settingsDrawer.querySelector(".inline-drawer-toggle");
+  const drawerContent = settingsDrawer.querySelector(".inline-drawer-content");
+
+  // Only trigger ST's toggle if the drawer is currently closed. ST sets the
+  // 'open' class on the toggle when expanded, so we mirror that check and let
+  // ST handle the icon + content state itself (avoids the stuck-drawer bug).
+  const isOpen =
+    drawerToggle?.classList.contains("open") ||
+    drawerContent?.classList.contains("open");
+  if (drawerToggle && !isOpen) {
+    drawerToggle.click();
+  }
+
+  settingsDrawer.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  // Brief highlight effect to draw attention.
+  settingsDrawer.classList.add("sdc-settings-flash");
+  setTimeout(() => settingsDrawer.classList.remove("sdc-settings-flash"), 800);
+}
+
+/**
+ * Adds a button to SillyTavern's wand (Extensions) dropdown menu that opens the
+ * extension's settings. The menu is built lazily by ST, so we poll for it
+ * instead of assuming it exists at init time (this was the source of the
+ * "button never shows / hangs in the wand menu" bug).
+ *
+ * @returns {boolean} true if the button was added or already exists
  */
 function addExtensionMenuButton() {
-  // Select the Extensions dropdown menu
-  const extensionsMenu = document.getElementById("extensionsMenu");
-  if (!extensionsMenu) {
-    console.warn("[SDC] Extensions menu not found");
-    return;
-  }
+  // ST builds the wand items inside '#extensionsMenu .list-group'. Fall back to
+  // the menu root or the gallery wand container for older/newer ST layouts.
+  const container =
+    document.querySelector("#extensionsMenu .list-group") ||
+    document.getElementById("extensionsMenu") ||
+    document.getElementById("gallery_wand_container");
+  if (!(container instanceof HTMLElement)) return false;
 
-  // Check if button already exists to prevent duplicates
-  if (document.getElementById("sdc-extensions-menu-button")) {
-    return;
-  }
+  // Already present — nothing to do.
+  if (document.getElementById("sdc-extensions-menu-button")) return true;
 
-  // Create button element with palette icon and extension name
   const button = document.createElement("div");
   button.id = "sdc-extensions-menu-button";
   button.className = "list-group-item flex-container flexGap5 interactable";
-  button.title = "Open Smart Dialogue Colorizer Settings";
-  button.setAttribute("tabindex", "0");
-  button.innerHTML = `
-        <i class="fa-solid fa-palette"></i>
-        <span>Dialogue Colorizer</span>
-    `;
+  button.title = "Open Palette Talk Settings";
+  button.tabIndex = 0;
+  button.setAttribute("role", "button");
 
-  // Append to extensions menu
-  extensionsMenu.appendChild(button);
+  const icon = document.createElement("i");
+  icon.className = "fa-solid fa-palette extensionsMenuExtensionButton";
+  const label = document.createElement("span");
+  label.textContent = "Palette Talk";
+  button.appendChild(icon);
+  button.appendChild(label);
 
-  // Set click handler to scroll to and open the settings
-  button.addEventListener("click", () => {
-    // Find the settings drawer
-    const settingsDrawer = document.getElementById("sdc-extension-settings");
-    if (!settingsDrawer) {
-      console.warn("[SDC] Settings drawer not found");
-      return;
+  // Guard against double-fire: touch devices fire 'touchend' plus a synthetic
+  // 'click' for a single tap. Only preventDefault — do NOT stopPropagation, or
+  // ST's delegated document click handler that closes the wand menu won't run.
+  let lastFire = 0;
+  const activate = (e) => {
+    e.preventDefault();
+    const now = Date.now();
+    if (now - lastFire < 400) return;
+    lastFire = now;
+    openSettingsDrawer();
+    closeExtensionsMenu();
+  };
+  button.addEventListener("click", activate);
+  button.addEventListener("touchend", activate, { passive: false });
+
+  container.appendChild(button);
+  return true;
+}
+
+/**
+ * Polls for ST's wand menu and inserts our button once it exists.
+ * @returns {number} interval id (so it can be cleared on dispose)
+ */
+function scheduleExtensionMenuButton() {
+  if (addExtensionMenuButton()) return 0;
+  let tries = 0;
+  const timer = window.setInterval(() => {
+    if (addExtensionMenuButton() || ++tries > 40) {
+      clearInterval(timer);
     }
-
-    // Scroll to the settings
-    settingsDrawer.scrollIntoView({ behavior: "smooth", block: "start" });
-
-    // Open the drawer if it's not already open
-    const drawerToggle = settingsDrawer.querySelector(".inline-drawer-toggle");
-    const drawerContent = settingsDrawer.querySelector(
-      ".inline-drawer-content"
-    );
-    const drawerIcon = settingsDrawer.querySelector(".inline-drawer-icon");
-
-    if (
-      drawerToggle &&
-      drawerContent &&
-      !drawerContent.classList.contains("open")
-    ) {
-      drawerToggle.classList.add("open");
-      drawerContent.classList.add("open");
-      if (drawerIcon) {
-        drawerIcon.classList.remove("down");
-        drawerIcon.classList.add("up");
-      }
-    }
-
-    // Brief highlight effect to draw attention
-    settingsDrawer.style.transition = "background-color 0.3s ease";
-    const originalBg = settingsDrawer.style.backgroundColor;
-    settingsDrawer.style.backgroundColor =
-      "rgba(var(--SmartThemeBodyColor), 0.3)";
-    setTimeout(() => {
-      settingsDrawer.style.backgroundColor = originalBg;
-    }, 600);
-  });
+  }, 500);
+  return timer;
 }
 
 function initializeCharSpecificUI() {
@@ -883,6 +1143,28 @@ function initializeCharSpecificUI() {
         textInput.value = "";
         colorInput.value = "#808080";
       }
+
+      // Reflect the chosen colour in the live preview. When cleared, fall back
+      // to the auto-detected avatar colour so the preview is still meaningful.
+      if (value) {
+        updatePreview(value);
+      } else {
+        updatePreviewFromAuto();
+      }
+    }
+
+    /**
+     * Updates the preview using the colour SDC would auto-pick for this
+     * character (avatar-smart / static), so an empty override still previews.
+     */
+    async function updatePreviewFromAuto() {
+      try {
+        const stChar = stCharGetter();
+        const autoColor = await getCharacterDialogueColor(stChar);
+        updatePreview(autoColor ? `#${autoColor.toHex()}` : "");
+      } catch (_) {
+        updatePreview("");
+      }
     }
 
     // Create preset swatch buttons
@@ -953,6 +1235,25 @@ function initializeCharSpecificUI() {
     customInputWrapper.appendChild(textInput);
     customInputWrapper.appendChild(colorPickerWrapper);
 
+    // Eyedropper button — pick a colour straight from an avatar (or anywhere on
+    // screen with the native EyeDropper API). This is the headline feature.
+    const eyedropperBtn = document.createElement("button");
+    eyedropperBtn.type = "button";
+    eyedropperBtn.className = "menu_button menu_button_icon sdc-eyedropper-btn";
+    eyedropperBtn.innerHTML = '<i class="fa-solid fa-eye-dropper"></i>';
+    eyedropperBtn.title = isNativeEyeDropperSupported()
+      ? "Pick a colour from anywhere on screen (e.g. the avatar)"
+      : "Pick a colour by clicking on an avatar image";
+    eyedropperBtn.onclick = async () => {
+      eyedropperBtn.classList.add("sdc-eyedropper-btn-active");
+      try {
+        const hex = await pickColor();
+        if (hex) applyColorOverride(hex);
+      } finally {
+        eyedropperBtn.classList.remove("sdc-eyedropper-btn-active");
+      }
+    };
+
     // Reset button
     const resetBtn = document.createElement("button");
     resetBtn.type = "button";
@@ -966,12 +1267,32 @@ function initializeCharSpecificUI() {
     controlRow.appendChild(presetsContainer);
     controlRow.appendChild(divider);
     controlRow.appendChild(customInputWrapper);
+    controlRow.appendChild(eyedropperBtn);
     controlRow.appendChild(resetBtn);
+
+    // Live preview — shows a sample dialogue line in the chosen colour so the
+    // user can judge readability before committing.
+    const previewRow = document.createElement("div");
+    previewRow.className = "sdc-preview-row";
+    const previewQuote = document.createElement("span");
+    previewQuote.className = "sdc-preview-quote";
+    previewQuote.textContent = '"The quick brown fox."';
+    const previewLabel = document.createElement("span");
+    previewLabel.className = "sdc-preview-label";
+    previewLabel.textContent = "Preview";
+    previewRow.appendChild(previewLabel);
+    previewRow.appendChild(previewQuote);
+
+    /** @param {string} hex */
+    function updatePreview(hex) {
+      previewQuote.style.color = hex && hex.length ? hex : "";
+    }
 
     // Assemble wrapper
     wrapper.appendChild(separator);
     wrapper.appendChild(labelRow);
     wrapper.appendChild(controlRow);
+    wrapper.appendChild(previewRow);
 
     // Expose a setter so the persona/character change handlers can refresh UI state
     // when the selected persona/character changes.
@@ -1076,7 +1397,24 @@ function initializeCharSpecificUI() {
 }
 
 jQuery(async ($) => {
-  const settingsHtml = await $.get(`${extFolderPath}/dialogue-colorizer.html`);
+  // Hot-reload guard: if a previous instance is still around (e.g. the user
+  // re-installed/updated without a full page reload), tear it down first so we
+  // don't end up with duplicate buttons, observers and style sheets.
+  if (window.__sdcInitialized && typeof window.__sdcDispose === "function") {
+    try {
+      window.__sdcDispose();
+    } catch (e) {
+      console.warn("[Palette Talk] Previous dispose failed:", e);
+    }
+  }
+  window.__sdcInitialized = true;
+
+  /** @type {Array<() => void>} Cleanup callbacks run on dispose. */
+  const cleanupTasks = [];
+  /** @param {() => void} fn */
+  const onDispose = (fn) => cleanupTasks.push(fn);
+
+  const settingsHtml = await $.get(`${extFolderPath}/palette-talk.html`);
 
   const elemStExtensionSettings2 = document.getElementById(
     "extensions_settings2"
@@ -1085,12 +1423,18 @@ jQuery(async ($) => {
 
   initializeStyleSheets();
   initializeSettingsUI();
+  initializeNameOverridesUI();
   initializeCharSpecificUI();
 
-  // Add extension menu button for quick access to settings
-  addExtensionMenuButton();
+  // Add extension menu button for quick access to settings (polls for the wand
+  // menu, since ST builds it lazily).
+  const wandTimer = scheduleExtensionMenuButton();
+  if (wandTimer) onDispose(() => clearInterval(wandTimer));
 
-  eventSource.on(event_types.CHAT_CHANGED, () => updateCharactersStyleSheet());
+  eventSource.on(event_types.CHAT_CHANGED, () => {
+    updateCharactersStyleSheet();
+    updateNamesStyleSheet();
+  });
   expEventSource.on(exp_event_type.MESSAGE_ADDED, addAuthorUidClassToMessage);
 
   expEventSource.on(exp_event_type.CHAR_CARD_CHANGED, (char) => {
@@ -1117,6 +1461,7 @@ jQuery(async ($) => {
     addAuthorUidToExistingMessages();
     updateCharactersStyleSheet();
     updatePersonasStyleSheet();
+    updateNamesStyleSheet();
   });
 
   // Watch for persona changes in the Persona Management panel (#PersonaManagement)
@@ -1141,6 +1486,8 @@ jQuery(async ($) => {
     return false;
   }
 
+  onDispose(() => personaManagementObserver.disconnect());
+
   if (!tryObservePersonaManagement()) {
     // Panel doesn't exist yet, watch for it to be created
     const panelWatcher = new MutationObserver(() => {
@@ -1149,6 +1496,7 @@ jQuery(async ($) => {
       }
     });
     panelWatcher.observe(document.body, { childList: true, subtree: true });
+    onDispose(() => panelWatcher.disconnect());
   }
 
   // Watch for theme changes to update colors automatically
@@ -1169,6 +1517,31 @@ jQuery(async ($) => {
     attributes: true,
     attributeFilter: ["class", "style"],
   });
+  onDispose(() => themeObserver.disconnect());
+
+  // ---------------------------------------------------------------------
+  // Dispose — removes injected DOM/observers so a hot-reload starts clean.
+  // ---------------------------------------------------------------------
+  window.__sdcDispose = function sdcDispose() {
+    for (const task of cleanupTasks) {
+      try {
+        task();
+      } catch (_) {
+        /* noop — keep disposing the rest */
+      }
+    }
+    // Remove injected DOM nodes.
+    [
+      "sdc-extension-settings",
+      "sdc-extensions-menu-button",
+      "sdc-chars_style_sheet",
+      "sdc-personas_style_sheet",
+      "sdc-names_style_sheet",
+      "sdc-char_color_override",
+      "sdc-persona_color_override",
+    ].forEach((id) => document.getElementById(id)?.remove());
+    window.__sdcInitialized = false;
+  };
 });
 
 //#endregion Initialization

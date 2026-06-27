@@ -1,4 +1,4 @@
-# Installation Guide - Smart Dialogue Colorizer
+# Installation Guide - Palette Talk
 
 ## 📦 Quick Install
 
@@ -15,13 +15,13 @@
 
 1. Navigate to your SillyTavern directory
 2. Go to: `public/scripts/extensions/third-party/`
-3. Create a folder named: `Smart-Dialogue-Colorizer`
+3. Create a folder named: `SillyTavern-Palette-Talk`
 4. Copy all extension files into this folder:
    ```
-   Smart-Dialogue-Colorizer/
+   SillyTavern-Palette-Talk/
    ├── manifest.json
    ├── index.js
-   ├── dialogue-colorizer.html
+   ├── palette-talk.html
    ├── style.css
    ├── color-utils.js
    ├── element-creators.js
@@ -29,6 +29,7 @@
    ├── st-utils.js
    ├── STCharacter.js
    ├── ExColor.js
+   ├── eyedropper.js
    ├── utils.js
    ├── ByRef.js
    ├── Vibrant.min.js
@@ -42,7 +43,7 @@
 ## ⚙️ Initial Setup
 
 1. Open the **Extensions** panel (puzzle piece icon)
-2. Scroll down to find **Smart Dialogue Colorizer**
+2. Scroll down to find **Palette Talk**
 3. Click to expand the settings
 
 ### Character Settings
@@ -57,9 +58,17 @@
 
 ### For Characters:
 1. Open the **Character Editor** (edit any character)
-2. Look for **Dialogue Color** field (below avatar)
-3. Enter a hex color (e.g., `#FF5733` or `F44`)
-4. Save the character
+2. Look for the **Dialogue Color** row (below avatar)
+3. Pick a color one of three ways:
+   - Click a **preset swatch**
+   - Type a hex color (e.g., `#FF5733` or `F44`) / use the color box
+   - Click the **eyedropper** to sample a color from the avatar
+4. The **Preview** line shows how the color will look
+
+### For NPCs voiced via "Send As":
+1. Open the **Palette Talk** settings (Extensions panel)
+2. Find the **Send As / NPC Colors** section
+3. Type the NPC's name + a color, click **Add**
 
 ### For Personas:
 1. Open **User Settings**
@@ -91,7 +100,7 @@
 - Or use "Static Color" mode for consistent results
 
 ### Extension Not Loading
-- Check folder name is exactly: `Smart-Dialogue-Colorizer`
+- Check folder name is exactly: `SillyTavern-Palette-Talk`
 - Verify all files are present (especially `manifest.json`)
 - Check browser console (F12) for error messages
 - Make sure SillyTavern is up to date
@@ -112,8 +121,8 @@
 
 If you encounter issues:
 1. Check browser console (F12) for errors
-2. Look for messages starting with `[SDC]`
-3. Verify extension version in manifest.json (should be 2.0.0)
+2. Look for messages starting with `[Palette Talk]`
+3. Verify extension version in manifest.json (should be 3.0.0)
 4. Report issues with:
    - SillyTavern version
    - Browser and version

@@ -1,4 +1,4 @@
-# SillyTavern Smart Dialogue Colorizer - AI Instructions
+# Palette Talk (SillyTavern) - AI Instructions
 
 ## Project Overview
 This is a **SillyTavern Extension** that dynamically colors dialogue quotes in chat messages based on character avatars. It runs within the SillyTavern browser environment, interacting directly with the DOM and SillyTavern's global state.

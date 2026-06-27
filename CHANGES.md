@@ -1,6 +1,42 @@
-# Smart Dialogue Colorizer - Changes Summary
+# Palette Talk - Changes Summary
 
-## 🆕 Version 1.1.0 - New Features (November 2025)
+## 🆕 Version 3.0.0 - "Palette Talk" Fork (Nufahi)
+
+**Renamed to Palette Talk.** This fork of
+`b4bysw0rld/SillyTavern-Smart-Dialogue-Colorizer` fixes the wand-menu bug and
+adds an eyedropper, live preview, NPC name colors, mobile support and a
+hot-reload guard.
+
+> The internal name is now `SillyTavern-Palette-Talk`, so settings are stored
+> separately and Palette Talk can coexist with the original extension.
+
+### 🐛 Bug fixes
+- **Wand (Extensions) menu button fixed.** The button now reliably appears in
+  the wand menu (polls for the lazily-built menu instead of giving up at load),
+  is inserted into the correct `.list-group` container, closes the wand menu on
+  click, and no longer leaves the settings drawer stuck half-open. Touch devices
+  get a double-fire guard.
+
+### ✨ New features
+- **Eyedropper (color picker pipette).** Pick a dialogue color straight from a
+  character avatar. Uses the native `EyeDropper` API where available (sample any
+  pixel on screen), with a click-on-avatar fallback that samples the pixel via
+  canvas for browsers without it.
+- **Live dialogue preview.** The per-character / persona override UI now shows a
+  sample quote in the chosen color so you can judge readability before saving.
+  When no override is set, it previews the auto-detected avatar color.
+- **Send As / NPC colors by name (fixes upstream Issue #1).** A new settings
+  section lets you map a character *name* to a color. "Send As" NPC messages —
+  which have no resolvable avatar — are now colored by name. Message author
+  resolution no longer hard-fails for these messages.
+- **Mobile adaptation.** Bigger touch targets, wrapping controls, and 16px inputs
+  to stop iOS Safari zoom. Uses `@media (max-width: 768px), (pointer: coarse)`.
+- **Hot-reload guard + dispose.** Re-installing/updating without a full reload no
+  longer leaves duplicate buttons, observers or style sheets behind.
+
+---
+
+## Version 1.1.0 - New Features (November 2025)
 
 ### Global Color Adjustments
 - **Saturation Boost Slider**: Increase color vibrancy with a 0-10 range
